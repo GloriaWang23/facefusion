@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
@@ -8,15 +9,24 @@ from urllib.parse import urlparse
 from tqdm import tqdm
 
 import facefusion.choices
-from facefusion import curl_builder, logger, process_manager, state_manager, translator
+from facefusion import aria2_builder, curl_builder, logger, process_manager, state_manager, translator
 from facefusion.filesystem import get_file_name, get_file_size, is_file, remove_file
 from facefusion.hash_helper import validate_hash
 from facefusion.types import Command, DownloadProvider, DownloadSet
 
 
+def is_aria2c_available() -> bool:
+	return shutil.which('aria2c') is not None
+
+
 def open_curl(commands : List[Command]) -> subprocess.Popen[bytes]:
 	commands = curl_builder.run(commands)
 	return subprocess.Popen(commands, stdin = subprocess.PIPE, stdout = subprocess.PIPE)
+
+
+def open_aria2c(commands : List[Command]) -> subprocess.Popen[bytes]:
+	commands = aria2_builder.run(commands)
+	return subprocess.Popen(commands, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
 
 
 def conditional_download(download_directory_path : str, urls : List[str], position : int = 0) -> None:
@@ -28,12 +38,20 @@ def conditional_download(download_directory_path : str, urls : List[str], positi
 
 		if initial_size < download_size:
 			with tqdm(total = download_size, initial = initial_size, desc = translator.get('downloading'), unit = 'B', unit_scale = True, unit_divisor = 1024, ascii = ' =', position = position, leave = True, disable = state_manager.get_item('log_level') in [ 'warn', 'error' ]) as progress:
-				commands = curl_builder.chain(
-					curl_builder.download(url, download_file_path),
-					curl_builder.set_timeout(5),
-					curl_builder.set_retry(5)
-				)
-				open_curl(commands)
+				if is_aria2c_available():
+					commands = aria2_builder.chain(
+						aria2_builder.download(url, download_directory_path, download_file_name),
+						aria2_builder.set_timeout(5),
+						aria2_builder.set_retry(5)
+					)
+					open_aria2c(commands)
+				else:
+					commands = curl_builder.chain(
+						curl_builder.download(url, download_file_path),
+						curl_builder.set_timeout(5),
+						curl_builder.set_retry(5)
+					)
+					open_curl(commands)
 				current_size = initial_size
 				progress.set_postfix(download_providers = state_manager.get_item('download_providers'), file_name = download_file_name)
 
