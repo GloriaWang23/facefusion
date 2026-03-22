@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List, Sequence, get_args
 
 from facefusion.common_helper import create_float_range, create_int_range
@@ -114,6 +115,14 @@ execution_provider_set : ExecutionProviderSet =\
 	'cpu': 'CPUExecutionProvider'
 }
 execution_providers : List[ExecutionProvider] = list(get_args(ExecutionProvider))
+
+def _build_huggingface_urls() -> List[str]:
+	hf_endpoint = os.environ.get('HF_ENDPOINT', '').rstrip('/')
+	if hf_endpoint:
+		return [ hf_endpoint ]
+	return [ 'https://huggingface.co', 'https://hf-mirror.com' ]
+
+
 download_provider_set : DownloadProviderSet =\
 {
 	'github':
@@ -126,11 +135,7 @@ download_provider_set : DownloadProviderSet =\
 	},
 	'huggingface':
 	{
-		'urls':
-		[
-			'https://huggingface.co',
-			'https://hf-mirror.com'
-		],
+		'urls': _build_huggingface_urls(),
 		'path': '/facefusion/{base_name}/resolve/main/{file_name}'
 	}
 }

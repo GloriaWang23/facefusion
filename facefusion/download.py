@@ -1,5 +1,6 @@
 import os
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
@@ -18,7 +19,7 @@ def open_curl(commands : List[Command]) -> subprocess.Popen[bytes]:
 	return subprocess.Popen(commands, stdin = subprocess.PIPE, stdout = subprocess.PIPE)
 
 
-def conditional_download(download_directory_path : str, urls : List[str]) -> None:
+def conditional_download(download_directory_path : str, urls : List[str], position : int = 0) -> None:
 	for url in urls:
 		download_file_name = os.path.basename(urlparse(url).path)
 		download_file_path = os.path.join(download_directory_path, download_file_name)
@@ -26,7 +27,7 @@ def conditional_download(download_directory_path : str, urls : List[str]) -> Non
 		download_size = get_static_download_size(url)
 
 		if initial_size < download_size:
-			with tqdm(total = download_size, initial = initial_size, desc = translator.get('downloading'), unit = 'B', unit_scale = True, unit_divisor = 1024, ascii = ' =', disable = state_manager.get_item('log_level') in [ 'warn', 'error' ]) as progress:
+			with tqdm(total = download_size, initial = initial_size, desc = translator.get('downloading'), unit = 'B', unit_scale = True, unit_divisor = 1024, ascii = ' =', position = position, leave = True, disable = state_manager.get_item('log_level') in [ 'warn', 'error' ]) as progress:
 				commands = curl_builder.chain(
 					curl_builder.download(url, download_file_path),
 					curl_builder.set_timeout(5),
@@ -77,12 +78,14 @@ def conditional_download_hashes(hash_set : DownloadSet) -> bool:
 	process_manager.check()
 	_, invalid_hash_paths = validate_hash_paths(hash_paths)
 	if invalid_hash_paths:
+		download_tasks = []
 		for index in hash_set:
 			if hash_set.get(index).get('path') in invalid_hash_paths:
 				invalid_hash_url = hash_set.get(index).get('url')
 				if invalid_hash_url:
 					download_directory_path = os.path.dirname(hash_set.get(index).get('path'))
-					conditional_download(download_directory_path, [ invalid_hash_url ])
+					download_tasks.append((download_directory_path, [ invalid_hash_url ]))
+		parallel_download(download_tasks)
 
 	valid_hash_paths, invalid_hash_paths = validate_hash_paths(hash_paths)
 
@@ -104,12 +107,14 @@ def conditional_download_sources(source_set : DownloadSet) -> bool:
 	process_manager.check()
 	_, invalid_source_paths = validate_source_paths(source_paths)
 	if invalid_source_paths:
+		download_tasks = []
 		for index in source_set:
 			if source_set.get(index).get('path') in invalid_source_paths:
 				invalid_source_url = source_set.get(index).get('url')
 				if invalid_source_url:
 					download_directory_path = os.path.dirname(source_set.get(index).get('path'))
-					conditional_download(download_directory_path, [ invalid_source_url ])
+					download_tasks.append((download_directory_path, [ invalid_source_url ]))
+		parallel_download(download_tasks)
 
 	valid_source_paths, invalid_source_paths = validate_source_paths(source_paths)
 
@@ -126,6 +131,14 @@ def conditional_download_sources(source_set : DownloadSet) -> bool:
 	if not invalid_source_paths:
 		process_manager.end()
 	return not invalid_source_paths
+
+
+def parallel_download(download_tasks : List[Tuple[str, List[str]]]) -> None:
+	max_workers = min(len(download_tasks), 4)
+	with ThreadPoolExecutor(max_workers = max_workers) as executor:
+		futures = [ executor.submit(conditional_download, directory_path, urls, position) for position, (directory_path, urls) in enumerate(download_tasks) ]
+		for future in as_completed(futures):
+			future.result()
 
 
 def validate_hash_paths(hash_paths : List[str]) -> Tuple[List[str], List[str]]:
