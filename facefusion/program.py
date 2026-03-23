@@ -1,3 +1,4 @@
+import json
 import tempfile
 from argparse import ArgumentParser, HelpFormatter
 from functools import partial
@@ -129,7 +130,8 @@ def create_face_selector_program() -> ArgumentParser:
 	group_face_selector.add_argument('--reference-face-position', help = translator.get('help.reference_face_position'), type = int, default = config.get_int_value('face_selector', 'reference_face_position', '0'))
 	group_face_selector.add_argument('--reference-face-distance', help = translator.get('help.reference_face_distance'), type = float, default = config.get_float_value('face_selector', 'reference_face_distance', '0.3'), choices = facefusion.choices.reference_face_distance_range, metavar = create_float_metavar(facefusion.choices.reference_face_distance_range))
 	group_face_selector.add_argument('--reference-frame-number', help = translator.get('help.reference_frame_number'), type = int, default = config.get_int_value('face_selector', 'reference_frame_number', '0'))
-	job_store.register_step_keys([ 'face_selector_mode', 'face_selector_order', 'face_selector_gender', 'face_selector_race', 'face_selector_age_start', 'face_selector_age_end', 'reference_face_position', 'reference_face_distance', 'reference_frame_number' ])
+	group_face_selector.add_argument('--face-swap-pairs', help = translator.get('help.face_swap_pairs'), type = json.loads, default = config.get_str_value('face_selector', 'face_swap_pairs'))
+	job_store.register_step_keys([ 'face_selector_mode', 'face_selector_order', 'face_selector_gender', 'face_selector_race', 'face_selector_age_start', 'face_selector_age_end', 'reference_face_position', 'reference_face_distance', 'reference_frame_number', 'face_swap_pairs' ])
 	return program
 
 

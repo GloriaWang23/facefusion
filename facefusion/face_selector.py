@@ -1,10 +1,10 @@
-from typing import List
+from typing import Dict, List
 
 import numpy
 
 from facefusion import state_manager
 from facefusion.face_analyser import get_many_faces, get_one_face
-from facefusion.types import Face, FaceSelectorOrder, Gender, Race, Score, VisionFrame
+from facefusion.types import Face, FaceSwapPair, FaceSelectorOrder, Gender, Race, Score, VisionFrame
 
 
 def select_faces(reference_vision_frame : VisionFrame, target_vision_frame : VisionFrame) -> List[Face]:
@@ -27,6 +27,26 @@ def select_faces(reference_vision_frame : VisionFrame, target_vision_frame : Vis
 			return match_faces
 
 	return []
+
+
+def select_mapped_faces(reference_vision_frame : VisionFrame, target_vision_frame : VisionFrame, face_swap_pairs : List[FaceSwapPair]) -> Dict[int, List[Face]]:
+	target_faces = get_many_faces([ target_vision_frame ])
+	reference_faces = get_many_faces([ reference_vision_frame ])
+	reference_faces = sort_and_filter_faces(reference_faces)
+	face_distance = state_manager.get_item('reference_face_distance')
+	pair_face_map : Dict[int, List[Face]] = {}
+
+	for pair_index, pair in enumerate(face_swap_pairs):
+		if not pair.get('source_paths'):
+			continue
+		reference_face_position = pair.get('reference_face_position', pair_index)
+		reference_face = get_one_face(reference_faces, reference_face_position)
+		if reference_face:
+			matched_faces = find_match_faces([ reference_face ], target_faces, face_distance)
+			if matched_faces:
+				pair_face_map[pair_index] = matched_faces
+
+	return pair_face_map
 
 
 def find_match_faces(reference_faces : List[Face], target_faces : List[Face], face_distance : float) -> List[Face]:

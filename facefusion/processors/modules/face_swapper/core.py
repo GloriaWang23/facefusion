@@ -15,7 +15,7 @@ from facefusion.execution import has_execution_provider
 from facefusion.face_analyser import get_average_face, get_many_faces, get_one_face, scale_face
 from facefusion.face_helper import paste_back, warp_face_by_face_landmark_5
 from facefusion.face_masker import create_area_mask, create_box_mask, create_occlusion_mask, create_region_mask
-from facefusion.face_selector import select_faces, sort_faces_by_order
+from facefusion.face_selector import select_faces, select_mapped_faces, sort_faces_by_order
 from facefusion.filesystem import filter_image_paths, has_image, in_directory, is_image, is_video, resolve_relative_path, same_file_extension
 from facefusion.model_helper import get_static_model_initializer
 from facefusion.processors.modules.face_swapper import choices as face_swapper_choices
@@ -535,17 +535,32 @@ def pre_check() -> bool:
 
 
 def pre_process(mode : ProcessMode) -> bool:
-	if not has_image(state_manager.get_item('source_paths')):
-		logger.error(translator.get('choose_image_source') + translator.get('exclamation_mark'), __name__)
-		return False
+	face_selector_mode = state_manager.get_item('face_selector_mode')
+	face_swap_pairs = state_manager.get_item('face_swap_pairs')
 
-	source_image_paths = filter_image_paths(state_manager.get_item('source_paths'))
-	source_vision_frames = read_static_images(source_image_paths)
-	source_faces = get_many_faces(source_vision_frames)
+	if face_selector_mode == 'map' and face_swap_pairs:
+		for pair in face_swap_pairs:
+			pair_source_paths = filter_image_paths(pair.get('source_paths') or [])
+			if not pair_source_paths:
+				logger.error(translator.get('choose_image_source') + translator.get('exclamation_mark'), __name__)
+				return False
+			pair_source_frames = read_static_images(pair_source_paths)
+			pair_source_faces = get_many_faces(pair_source_frames)
+			if not get_one_face(pair_source_faces):
+				logger.error(translator.get('no_source_face_detected') + translator.get('exclamation_mark'), __name__)
+				return False
+	else:
+		if not has_image(state_manager.get_item('source_paths')):
+			logger.error(translator.get('choose_image_source') + translator.get('exclamation_mark'), __name__)
+			return False
 
-	if not get_one_face(source_faces):
-		logger.error(translator.get('no_source_face_detected') + translator.get('exclamation_mark'), __name__)
-		return False
+		source_image_paths = filter_image_paths(state_manager.get_item('source_paths'))
+		source_vision_frames = read_static_images(source_image_paths)
+		source_faces = get_many_faces(source_vision_frames)
+
+		if not get_one_face(source_faces):
+			logger.error(translator.get('no_source_face_detected') + translator.get('exclamation_mark'), __name__)
+			return False
 
 	if mode in [ 'output', 'preview' ] and not is_image(state_manager.get_item('target_path')) and not is_video(state_manager.get_item('target_path')):
 		logger.error(translator.get('choose_image_or_video_target') + translator.get('exclamation_mark'), __name__)
@@ -763,12 +778,27 @@ def process_frame(inputs : FaceSwapperInputs) -> ProcessorOutputs:
 	target_vision_frame = inputs.get('target_vision_frame')
 	temp_vision_frame = inputs.get('temp_vision_frame')
 	temp_vision_mask = inputs.get('temp_vision_mask')
-	source_face = extract_source_face(source_vision_frames)
-	target_faces = select_faces(reference_vision_frame, target_vision_frame)
+	face_selector_mode = state_manager.get_item('face_selector_mode')
+	face_swap_pairs = state_manager.get_item('face_swap_pairs')
 
-	if source_face and target_faces:
-		for target_face in target_faces:
-			target_face = scale_face(target_face, target_vision_frame, temp_vision_frame)
-			temp_vision_frame = swap_face(source_face, target_face, temp_vision_frame)
+	if face_selector_mode == 'map' and face_swap_pairs:
+		pair_face_map = select_mapped_faces(reference_vision_frame, target_vision_frame, face_swap_pairs)
+		for pair_index, target_faces in pair_face_map.items():
+			pair = face_swap_pairs[pair_index]
+			pair_source_paths = filter_image_paths(pair.get('source_paths') or [])
+			pair_source_frames = read_static_images(pair_source_paths)
+			source_face = extract_source_face(pair_source_frames)
+			if source_face:
+				for target_face in target_faces:
+					target_face = scale_face(target_face, target_vision_frame, temp_vision_frame)
+					temp_vision_frame = swap_face(source_face, target_face, temp_vision_frame)
+	else:
+		source_face = extract_source_face(source_vision_frames)
+		target_faces = select_faces(reference_vision_frame, target_vision_frame)
+
+		if source_face and target_faces:
+			for target_face in target_faces:
+				target_face = scale_face(target_face, target_vision_frame, temp_vision_frame)
+				temp_vision_frame = swap_face(source_face, target_face, temp_vision_frame)
 
 	return temp_vision_frame, temp_vision_mask
