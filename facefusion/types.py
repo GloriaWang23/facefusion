@@ -104,7 +104,7 @@ Content : TypeAlias = Dict[str, Any]
 Command : TypeAlias = str
 CommandSet : TypeAlias = Dict[str, List[Command]]
 
-WarpTemplate = Literal['arcface_112_v1', 'arcface_112_v2', 'arcface_128', 'dfl_whole_face', 'ffhq_512', 'mtcnn_512', 'styleganex_384']
+WarpTemplate = Literal['arcface_112_v1', 'arcface_112_v2', 'arcface_128', 'dfl_whole_face', 'ffhq_512', 'mtcnn_512', 'styleganex_384', 'head_256']
 WarpTemplateSet : TypeAlias = Dict[WarpTemplate, NDArray[Any]]
 ProcessMode = Literal['output', 'preview', 'stream']
 
@@ -129,7 +129,7 @@ FaceOccluderModel = Literal['many', 'xseg_1', 'xseg_2', 'xseg_3']
 FaceParserModel = Literal['bisenet_resnet_18', 'bisenet_resnet_34']
 FaceMaskType = Literal['box', 'occlusion', 'area', 'region']
 FaceMaskArea = Literal['upper-face', 'lower-face', 'mouth']
-FaceMaskRegion = Literal['skin', 'left-eyebrow', 'right-eyebrow', 'left-eye', 'right-eye', 'glasses', 'nose', 'mouth', 'upper-lip', 'lower-lip']
+FaceMaskRegion = Literal['skin', 'left-eyebrow', 'right-eyebrow', 'left-eye', 'right-eye', 'glasses', 'nose', 'mouth', 'upper-lip', 'lower-lip', 'left-ear', 'right-ear', 'neck', 'hair']
 FaceMaskRegionSet : TypeAlias = Dict[FaceMaskRegion, int]
 FaceMaskAreaSet : TypeAlias = Dict[FaceMaskArea, List[int]]
 

@@ -38,7 +38,11 @@ face_mask_region_set : FaceMaskRegionSet =\
 	'nose': 10,
 	'mouth': 11,
 	'upper-lip': 12,
-	'lower-lip': 13
+	'lower-lip': 13,
+	'left-ear': 7,
+	'right-ear': 8,
+	'neck': 14,
+	'hair': 17
 }
 face_mask_areas : List[FaceMaskArea] = list(get_args(FaceMaskArea))
 face_mask_regions : List[FaceMaskRegion] = list(get_args(FaceMaskRegion))

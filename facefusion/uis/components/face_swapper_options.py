@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, get_args
 
 import gradio
 
@@ -7,19 +7,23 @@ from facefusion.common_helper import calculate_float_step, get_first
 from facefusion.processors.core import load_processor_module
 from facefusion.processors.modules.face_swapper import choices as face_swapper_choices
 from facefusion.processors.modules.face_swapper.types import FaceSwapperModel, FaceSwapperWeight
+from facefusion.types import WarpTemplate
 from facefusion.uis.core import get_ui_component, register_ui_component
 
 FACE_SWAPPER_MODEL_DROPDOWN : Optional[gradio.Dropdown] = None
 FACE_SWAPPER_PIXEL_BOOST_DROPDOWN : Optional[gradio.Dropdown] = None
 FACE_SWAPPER_WEIGHT_SLIDER : Optional[gradio.Slider] = None
+FACE_SWAPPER_WARP_TEMPLATE_DROPDOWN : Optional[gradio.Dropdown] = None
 
 
 def render() -> None:
 	global FACE_SWAPPER_MODEL_DROPDOWN
 	global FACE_SWAPPER_PIXEL_BOOST_DROPDOWN
 	global FACE_SWAPPER_WEIGHT_SLIDER
+	global FACE_SWAPPER_WARP_TEMPLATE_DROPDOWN
 
 	has_face_swapper = 'face_swapper' in state_manager.get_item('processors')
+	warp_template_choices = [ 'auto' ] + list(get_args(WarpTemplate))
 	FACE_SWAPPER_MODEL_DROPDOWN = gradio.Dropdown(
 		label = translator.get('uis.model_dropdown', 'facefusion.processors.modules.face_swapper'),
 		choices = face_swapper_choices.face_swapper_models,
@@ -40,24 +44,32 @@ def render() -> None:
 		step = calculate_float_step(face_swapper_choices.face_swapper_weight_range),
 		visible = has_face_swapper and has_face_swapper_weight()
 	)
+	FACE_SWAPPER_WARP_TEMPLATE_DROPDOWN = gradio.Dropdown(
+		label = translator.get('uis.warp_template_dropdown', 'facefusion.processors.modules.face_swapper'),
+		choices = warp_template_choices,
+		value = state_manager.get_item('face_swapper_warp_template') or 'auto',
+		visible = has_face_swapper
+	)
 	register_ui_component('face_swapper_model_dropdown', FACE_SWAPPER_MODEL_DROPDOWN)
 	register_ui_component('face_swapper_pixel_boost_dropdown', FACE_SWAPPER_PIXEL_BOOST_DROPDOWN)
 	register_ui_component('face_swapper_weight_slider', FACE_SWAPPER_WEIGHT_SLIDER)
+	register_ui_component('face_swapper_warp_template_dropdown', FACE_SWAPPER_WARP_TEMPLATE_DROPDOWN)
 
 
 def listen() -> None:
 	FACE_SWAPPER_MODEL_DROPDOWN.change(update_face_swapper_model, inputs = FACE_SWAPPER_MODEL_DROPDOWN, outputs = [ FACE_SWAPPER_MODEL_DROPDOWN, FACE_SWAPPER_PIXEL_BOOST_DROPDOWN, FACE_SWAPPER_WEIGHT_SLIDER ])
 	FACE_SWAPPER_PIXEL_BOOST_DROPDOWN.change(update_face_swapper_pixel_boost, inputs = FACE_SWAPPER_PIXEL_BOOST_DROPDOWN)
 	FACE_SWAPPER_WEIGHT_SLIDER.change(update_face_swapper_weight, inputs = FACE_SWAPPER_WEIGHT_SLIDER)
+	FACE_SWAPPER_WARP_TEMPLATE_DROPDOWN.change(update_face_swapper_warp_template, inputs = FACE_SWAPPER_WARP_TEMPLATE_DROPDOWN)
 
 	processors_checkbox_group = get_ui_component('processors_checkbox_group')
 	if processors_checkbox_group:
-		processors_checkbox_group.change(remote_update, inputs = processors_checkbox_group, outputs = [ FACE_SWAPPER_MODEL_DROPDOWN, FACE_SWAPPER_PIXEL_BOOST_DROPDOWN, FACE_SWAPPER_WEIGHT_SLIDER ])
+		processors_checkbox_group.change(remote_update, inputs = processors_checkbox_group, outputs = [ FACE_SWAPPER_MODEL_DROPDOWN, FACE_SWAPPER_PIXEL_BOOST_DROPDOWN, FACE_SWAPPER_WEIGHT_SLIDER, FACE_SWAPPER_WARP_TEMPLATE_DROPDOWN ])
 
 
-def remote_update(processors : List[str]) -> Tuple[gradio.Dropdown, gradio.Dropdown, gradio.Slider]:
+def remote_update(processors : List[str]) -> Tuple[gradio.Dropdown, gradio.Dropdown, gradio.Slider, gradio.Dropdown]:
 	has_face_swapper = 'face_swapper' in processors
-	return gradio.Dropdown(visible = has_face_swapper), gradio.Dropdown(visible = has_face_swapper), gradio.Slider(visible = has_face_swapper)
+	return gradio.Dropdown(visible = has_face_swapper), gradio.Dropdown(visible = has_face_swapper), gradio.Slider(visible = has_face_swapper), gradio.Dropdown(visible = has_face_swapper)
 
 
 def update_face_swapper_model(face_swapper_model : FaceSwapperModel) -> Tuple[gradio.Dropdown, gradio.Dropdown, gradio.Slider]:
@@ -78,6 +90,13 @@ def update_face_swapper_pixel_boost(face_swapper_pixel_boost : str) -> None:
 
 def update_face_swapper_weight(face_swapper_weight : FaceSwapperWeight) -> None:
 	state_manager.set_item('face_swapper_weight', face_swapper_weight)
+
+
+def update_face_swapper_warp_template(face_swapper_warp_template : str) -> None:
+	if face_swapper_warp_template == 'auto':
+		state_manager.set_item('face_swapper_warp_template', None)
+	else:
+		state_manager.set_item('face_swapper_warp_template', face_swapper_warp_template)
 
 
 def has_face_swapper_weight() -> bool:
