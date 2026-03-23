@@ -83,6 +83,9 @@ def sort_and_filter_faces(faces : List[Face]) -> List[Face]:
 			faces = filter_faces_by_race(faces, state_manager.get_item('face_selector_race'))
 		if state_manager.get_item('face_selector_age_start') or state_manager.get_item('face_selector_age_end'):
 			faces = filter_faces_by_age(faces, state_manager.get_item('face_selector_age_start'), state_manager.get_item('face_selector_age_end'))
+		face_landmarker_score = state_manager.get_item('face_landmarker_score')
+		if face_landmarker_score > 0:
+			faces = filter_faces_by_landmarker_score(faces, face_landmarker_score)
 	return faces
 
 
@@ -146,5 +149,14 @@ def filter_faces_by_race(faces : List[Face], race : Race) -> List[Face]:
 
 	for face in faces:
 		if face.race == race:
+			filter_faces.append(face)
+	return filter_faces
+
+
+def filter_faces_by_landmarker_score(faces : List[Face], min_score : Score) -> List[Face]:
+	filter_faces = []
+
+	for face in faces:
+		if face.score_set.get('landmarker', 0) >= min_score:
 			filter_faces.append(face)
 	return filter_faces
